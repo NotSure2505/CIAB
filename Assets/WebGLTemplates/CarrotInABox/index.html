@@ -91,7 +91,6 @@
     position: relative;
     width: 260px; height: 200px;
     margin-bottom: -10px;
-    animation: box-float 6s ease-in-out infinite;
     opacity: 0;
     animation: box-float 6s ease-in-out infinite, fade-in-up 1.2s 0.3s forwards ease-out;
   }
@@ -374,86 +373,90 @@
   <!-- Box illustration -->
   <div class="box-wrap">
     <svg class="box-svg" viewBox="0 0 260 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="rgba(255,200,100,0.08)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.3)"/>
+        </linearGradient>
+        <linearGradient id="lidGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="rgba(255,200,100,0.12)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.2)"/>
+        </linearGradient>
+      </defs>
+
       <!-- Box shadow -->
       <ellipse cx="130" cy="195" rx="80" ry="8" fill="rgba(0,0,0,0.5)"/>
 
       <!-- Box body -->
       <rect x="30" y="90" width="200" height="105" rx="3"
             fill="#3d1f0a" stroke="#7a4420" stroke-width="1.5"/>
-      <!-- Box body shading -->
       <rect x="30" y="90" width="200" height="105" rx="3"
             fill="url(#boxGrad)"/>
-      <!-- Box wood grain lines -->
-      <line x1="60" y1="90" x2="60" y2="195" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
-      <line x1="100" y1="90" x2="100" y2="195" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
-      <line x1="160" y1="90" x2="160" y2="195" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+      <!-- Wood grain lines -->
+      <line x1="60"  y1="90" x2="60"  y2="195" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+      <line x1="100" y1="90" x2="100" y2="195" stroke="rgba(0,0,0,0.1)"  stroke-width="1"/>
+      <line x1="160" y1="90" x2="160" y2="195" stroke="rgba(0,0,0,0.1)"  stroke-width="1"/>
       <line x1="200" y1="90" x2="200" y2="195" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
 
-      <!-- Box lid -->
-      <rect x="22" y="75" width="216" height="22" rx="3"
-            fill="#4f2a0e" stroke="#8a5028" stroke-width="1.5"/>
-      <rect x="22" y="75" width="216" height="22" rx="3"
-            fill="url(#lidGrad)"/>
+      <!-- Label plate -->
+      <rect x="80" y="115" width="100" height="50" rx="2"
+            fill="rgba(200,140,60,0.12)" stroke="rgba(200,140,60,0.3)" stroke-width="1"/>
+      <text x="130" y="136" text-anchor="middle"
+            font-family="serif" font-size="8" fill="rgba(232,168,56,0.6)" letter-spacing="2">CONTENTS</text>
+      <text x="130" y="152" text-anchor="middle"
+            font-family="serif" font-size="7" fill="rgba(232,168,56,0.4)" letter-spacing="1">UNKNOWN</text>
 
-      <!-- Lid hinge detail -->
-      <rect x="115" y="73" width="30" height="6" rx="2"
-            fill="#6b3818" stroke="#9a6030" stroke-width="1"/>
+      <!-- Lid -->
+      <rect x="20" y="72" width="220" height="24" rx="3"
+            fill="#4a2510" stroke="#8a5030" stroke-width="1.5"/>
+      <rect x="20" y="72" width="220" height="24" rx="3"
+            fill="url(#lidGrad)"/>
+      <line x1="20" y1="84" x2="240" y2="84" stroke="rgba(255,200,100,0.1)" stroke-width="1"/>
 
       <!-- Carrot peeking out -->
       <g class="carrot-peek">
-        <!-- carrot body -->
-        <path d="M118 30 Q130 20 142 30 L138 80 Q130 85 122 80 Z"
-              fill="#e85d20"/>
-        <!-- carrot shading -->
-        <path d="M118 30 Q122 22 128 24 L124 78 Q120 80 118 75 Z"
-              fill="rgba(255,255,255,0.12)"/>
-        <path d="M136 30 Q140 25 142 30 L140 75 Q137 80 135 78 Z"
-              fill="rgba(0,0,0,0.15)"/>
-        <!-- carrot rings -->
-        <path d="M122 45 Q130 48 138 45" stroke="rgba(0,0,0,0.2)" stroke-width="1.5" fill="none"/>
-        <path d="M121 58 Q130 61 139 58" stroke="rgba(0,0,0,0.2)" stroke-width="1.5" fill="none"/>
-        <path d="M122 70 Q130 73 138 70" stroke="rgba(0,0,0,0.2)" stroke-width="1.5" fill="none"/>
-        <!-- carrot top greens -->
-        <path d="M128 30 C122 10 110 2 108 -5" stroke="#4a8c2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M130 28 C130 8 128 0 132 -8" stroke="#5aaa32" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M132 30 C138 12 148 4 150 -3" stroke="#4a8c2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M129 29 C126 15 120 10 118 5" stroke="#5aaa32" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- Carrot body -->
+        <ellipse cx="130" cy="68" rx="10" ry="22" fill="#e85d20"
+                 transform="rotate(-5 130 68)"/>
+        <ellipse cx="130" cy="68" rx="10" ry="22" fill="url(#carrotGrad)"
+                 transform="rotate(-5 130 68)"/>
+        <!-- Carrot tip -->
+        <path d="M122 85 Q130 95 138 85" fill="#d04510" transform="rotate(-5 130 68)"/>
+        <!-- Carrot top greens -->
+        <path d="M126 48 Q122 32 118 24" stroke="#4a8c2a" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <path d="M130 46 Q130 28 128 18" stroke="#5a9c3a" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <path d="M134 48 Q138 30 142 22" stroke="#4a8c2a" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <!-- Carrot lines -->
+        <path d="M123 58 Q130 60 137 58" stroke="rgba(180,50,0,0.4)" stroke-width="1" fill="none"
+              transform="rotate(-5 130 68)"/>
+        <path d="M122 65 Q130 67 138 65" stroke="rgba(180,50,0,0.4)" stroke-width="1" fill="none"
+              transform="rotate(-5 130 68)"/>
+        <defs>
+          <linearGradient id="carrotGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="rgba(255,255,255,0.15)"/>
+            <stop offset="50%"  stop-color="rgba(255,255,255,0)"/>
+            <stop offset="100%" stop-color="rgba(0,0,0,0.2)"/>
+          </linearGradient>
+        </defs>
       </g>
 
-      <!-- Box front label -->
-      <rect x="75" y="118" width="110" height="52" rx="2"
-            fill="rgba(245,210,160,0.07)" stroke="rgba(245,210,160,0.15)" stroke-width="1"/>
-      <text x="130" y="140" text-anchor="middle"
-            fill="rgba(245,210,160,0.4)" font-size="9"
-            font-family="Georgia, serif" font-style="italic" letter-spacing="2">CONTENTS</text>
-      <text x="130" y="156" text-anchor="middle"
-            fill="rgba(245,210,160,0.25)" font-size="8"
-            font-family="Georgia, serif" letter-spacing="1">UNKNOWN</text>
-
-      <!-- Corner nail details -->
-      <circle cx="38" cy="97" r="3" fill="#6b3818" stroke="#9a6030" stroke-width="0.5"/>
-      <circle cx="222" cy="97" r="3" fill="#6b3818" stroke="#9a6030" stroke-width="0.5"/>
-      <circle cx="38" cy="188" r="3" fill="#6b3818" stroke="#9a6030" stroke-width="0.5"/>
-      <circle cx="222" cy="188" r="3" fill="#6b3818" stroke="#9a6030" stroke-width="0.5"/>
-
-      <defs>
-        <linearGradient id="boxGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.06)"/>
-          <stop offset="100%" stop-color="rgba(0,0,0,0.3)"/>
-        </linearGradient>
-        <linearGradient id="lidGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.1)"/>
-          <stop offset="100%" stop-color="rgba(0,0,0,0.2)"/>
-        </linearGradient>
-      </defs>
+      <!-- Box corners / hardware -->
+      <rect x="28"  y="88"  width="6" height="6" rx="1" fill="#8a5030"/>
+      <rect x="226" y="88"  width="6" height="6" rx="1" fill="#8a5030"/>
+      <rect x="28"  y="188" width="6" height="6" rx="1" fill="#8a5030"/>
+      <rect x="226" y="188" width="6" height="6" rx="1" fill="#8a5030"/>
     </svg>
   </div>
 
   <!-- Title -->
   <div class="title-wrap">
-    <p class="eyebrow">A game of deception &amp; chance</p>
+    <p class="eyebrow">A Game of Deception &amp; Chance</p>
     <h1 class="title">
-      <span class="carrot-word">Carrot</span><br>in a Box
+      <span class="carrot-word">Carrot</span><br>
+      in a Box
     </h1>
     <p class="subtitle">Who has the carrot? Only one way to find out.</p>
   </div>
@@ -465,45 +468,42 @@
     <div class="divider-line right"></div>
   </div>
 
-  <!-- Auth Panel (shown when not logged in) -->
+  <!-- Auth panel (login) -->
   <div class="auth-panel" id="authPanel">
     <button class="btn-login" id="loginBtn" onclick="startLogin()">
-      <!-- itch.io logo SVG -->
-      <svg class="itch-logo" viewBox="0 0 245.371 220.736" xmlns="http://www.w3.org/2000/svg">
-        <path d="M31.99 1.365C21.287 7.72.2 31.945 0 38.298v10.516C0 62.144 12.46 73.86 23.773 73.86c13.584 0 24.902-11.259 24.902-24.82 0 13.561 10.97 24.82 24.553 24.82 13.584 0 24.208-11.259 24.208-24.82 0 13.561 11.32 24.82 24.903 24.82h.28c13.583 0 24.903-11.259 24.903-24.82 0 13.561 10.624 24.82 24.208 24.82 13.583 0 24.553-11.259 24.553-24.82 0 13.561 11.317 24.82 24.9 24.82 11.314 0 23.773-11.716 23.773-25.046V38.298c-.2-6.353-21.287-30.578-32-36.933C176.118-.59 68.67-.485 31.99 1.365zm80.986 ranking..." fill="white"/>
-        <path d="M31.99 1.365C21.287 7.72.2 31.945 0 38.298v10.516C0 62.144 12.46 73.86 23.773 73.86c13.584 0 24.902-11.259 24.902-24.82 0 13.561 10.97 24.82 24.553 24.82 13.584 0 24.208-11.259 24.208-24.82 0 13.561 11.32 24.82 24.903 24.82h.28c13.583 0 24.903-11.259 24.903-24.82 0 13.561 10.624 24.82 24.208 24.82 13.583 0 24.553-11.259 24.553-24.82 0 13.561 11.317 24.82 24.9 24.82 11.314 0 23.773-11.716 23.773-25.046V38.298c-.2-6.353-21.287-30.578-32-36.933C176.118-.59 68.67-.485 31.99 1.365z" fill="none"/>
+      <svg class="itch-logo" viewBox="0 0 245.1 220.2" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M31.99 1.365C21.287 7.72.2 31.945 0 38.298v10.516C0 62.144 9.743 73.84 23.responders 73.84c16.484 0 29.072-13.408 29.072-13.408... M0 0"/>
+        <path d="M122.4 65.5c-8.5 0-16.3 4.3-21.4 11-5.1-6.7-12.9-11-21.4-11-14.9 0-27 12.5-27 27.9v69.3h19.4V95c0-5.8 3.8-10.4 8.5-10.4s8.5 4.6 8.5 10.4v67.7h19.4V95c0-5.8 3.8-10.4 8.5-10.4s8.5 4.6 8.5 10.4v67.7h19.4V93.4c0-15.4-12.1-27.9-22.4-27.9z"/>
       </svg>
       Login with itch.io to Play
     </button>
     <p class="status-text" id="statusText">Sign in to join the game</p>
   </div>
 
-  <!-- Logged-in Panel (shown after auth) -->
+  <!-- Logged-in panel -->
   <div class="logged-in-panel" id="loggedInPanel">
     <div class="player-badge">
       <div class="player-avatar" id="playerInitial">?</div>
       <div class="player-info">
-        <div class="player-name" id="playerName">Loading...</div>
-        <div class="player-meta" id="playerMeta">itch.io • authenticated</div>
+        <div class="player-name" id="playerName">Player</div>
+        <div class="player-meta" id="playerMeta">itch.io · authenticated</div>
       </div>
     </div>
-    <button class="btn-play" onclick="enterLobby()">
-      🥕 &nbsp; Enter the Lobby
-    </button>
-    <button class="btn-logout" onclick="logout()">Sign out</button>
+    <button class="btn-play" onclick="enterLobby()">🥕 Enter the Game</button>
+    <button class="btn-logout" onclick="logout()">sign out</button>
   </div>
 
 </div>
 
-<p class="footer">© 2026 NotSure2505 &nbsp;·&nbsp; Built on itch.io</p>
+<p class="footer">© NotSure2505 · Built on itch.io</p>
 
 <script>
-  // ── Config ──────────────────────────────────────────────────────────────────
+  // ── Config ───────────────────────────────────────────────────────────────────
   const SERVER = 'https://sea-turtle-app-k7m7l.ondigitalocean.app';
 
   // ── Particles ────────────────────────────────────────────────────────────────
   const container = document.getElementById('particles');
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     const p = document.createElement('div');
     p.className = 'particle';
     p.style.cssText = `
@@ -539,9 +539,9 @@
 
   function showLoggedIn(player) {
     currentPlayer = player;
-    playerName.textContent = player.displayName || player.itchUsername;
+    playerName.textContent    = player.displayName || player.itchUsername;
     playerInitial.textContent = (player.displayName || player.itchUsername || '?')[0].toUpperCase();
-    const wins = player.wins || 0;
+    const wins  = player.wins || 0;
     const games = player.gamesPlayed || 0;
     playerMeta.textContent = games > 0
       ? `${wins}W / ${games}G · ${Math.round(wins/games*100)}% win rate`
@@ -563,7 +563,7 @@
     if (!token) return;
     setStatus('Restoring session...', 'loading');
     try {
-      const res = await fetch(`${SERVER}/auth/validate`, {
+      const res  = await fetch(`${SERVER}/auth/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
@@ -590,7 +590,10 @@
       const res  = await fetch(`${SERVER}/auth/login`);
       const data = await res.json();
 
-      // Open auth window
+      // Save the state so we can poll with it
+      const authState = data.state;
+
+      // Open auth popup
       const popup = window.open(data.authUrl, 'itchio_auth', 'width=620,height=720');
 
       if (!popup) {
@@ -601,7 +604,9 @@
 
       setStatus('Waiting for itch.io login', 'loading');
 
-      // Poll for completion
+      // ── Poll for completion using state param ────────────────────────────────
+      // This is the primary path. The server stores the token keyed by state
+      // after the OAuth callback completes, so we can retrieve it here.
       let attempts = 0;
       pollInterval = setInterval(async () => {
         attempts++;
@@ -611,7 +616,7 @@
           return;
         }
         try {
-          const pollRes  = await fetch(`${SERVER}/auth/poll`, { credentials: 'include' });
+          const pollRes  = await fetch(`${SERVER}/auth/poll?state=${authState}`);
           const pollData = await pollRes.json();
           if (pollData.ready && pollData.token) {
             clearInterval(pollInterval);
@@ -620,7 +625,7 @@
         } catch {}
       }, 2000);
 
-      // Also listen for postMessage from success page
+      // ── Also listen for postMessage (works if not inside itch.io iframe) ────
       window.addEventListener('message', async (e) => {
         try {
           const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
@@ -703,7 +708,7 @@
       }).then((unityInstance) => {
         loadingBar.style.display = 'none';
         canvas.style.display     = 'block';
-        // Send auth token to Unity C# ItchOAuthManager
+        // Send auth token to Unity C# ItchAuthManager
         unityInstance.SendMessage(
           'GameManager',
           'HandleWebGLAuthMessage',

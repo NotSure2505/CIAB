@@ -24,15 +24,15 @@ public class MatchmakingManager : MonoBehaviour
     [SerializeField] private string itchGameUrl   = "https://notsure2505.itch.io/carrot-in-a-box";
 
     [Header("UI References")]
-    [SerializeField] private TMP_Text   onlineCountText;    // "12 players online"
-    [SerializeField] private Button     findMatchButton;    // "Find Match"
-    [SerializeField] private Button     cancelQueueButton;  // "Cancel"
-    [SerializeField] private Button     createInviteButton; // "Invite a Friend"
-    [SerializeField] private TMP_Text   queueStatusText;    // "Searching for opponent..."
-    [SerializeField] private TMP_Text   inviteLinkText;     // shows the invite URL
-    [SerializeField] private Button     copyInviteButton;   // "Copy Link"
-    [SerializeField] private GameObject matchmakingPanel;   // the whole panel
-    [SerializeField] private GameObject invitePanel;        // invite link panel
+    [SerializeField] private TMP_Text   onlineCountText;
+    [SerializeField] private Button     findMatchButton;
+    [SerializeField] private Button     cancelQueueButton;
+    [SerializeField] private Button     createInviteButton;
+    [SerializeField] private TMP_Text   queueStatusText;
+    [SerializeField] private TMP_Text   inviteLinkText;
+    [SerializeField] private Button     copyInviteButton;
+    [SerializeField] private GameObject matchmakingPanel;
+    [SerializeField] private GameObject invitePanel;
 
     // ── Events ─────────────────────────────────────────────────────────────────
     public event Action<MatchData> OnMatchFound;
@@ -44,7 +44,11 @@ public class MatchmakingManager : MonoBehaviour
     public bool      IsInQueue     { get; private set; }
     public MatchData CurrentMatch  { get; private set; }
 
-    private string _currentInviteUrl;
+    private string    _currentInviteUrl;
+    // BUG FIX: track pending actions to execute once socket connects
+    private bool      _joinQueueOnConnect;
+    private bool      _createInviteOnConnect;
+    private Coroutine _pollCoroutine;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
     void Awake()
@@ -70,7 +74,12 @@ public class MatchmakingManager : MonoBehaviour
         if (matchmakingPanel) matchmakingPanel.SetActive(true);
         if (invitePanel)      invitePanel.SetActive(false);
         SetQueueUI(false);
-        StartCoroutine(PollOnlineCount());
+
+        // BUG FIX: stop any existing poll coroutine before starting a new one
+        // to prevent multiple concurrent polling coroutines accumulating on
+        // repeated ShowLobby() calls (e.g. opponent disconnect → back to lobby).
+        if (_pollCoroutine != null) StopCoroutine(_pollCoroutine);
+        _pollCoroutine = StartCoroutine(PollOnlineCount());
     }
 
     // ── Socket Connection ──────────────────────────────────────────────────────
@@ -88,6 +97,8 @@ public class MatchmakingManager : MonoBehaviour
 #else
         Debug.Log("[Matchmaking] Socket.io not available in Editor — using REST polling");
         IsConnected = true;
+        // BUG FIX: in editor, socket "connects" synchronously so run pending actions now
+        OnSocketConnected("connected");
 #endif
     }
 
@@ -102,8 +113,17 @@ public class MatchmakingManager : MonoBehaviour
     // ── Matchmaking Queue ──────────────────────────────────────────────────────
     public void JoinQueue()
     {
-        if (!IsConnected) { ConnectSocket(); return; }
+        if (!IsConnected)
+        {
+            // BUG FIX: was returning immediately after ConnectSocket() without ever
+            // actually joining the queue. Now we set a flag and join once connected.
+            _joinQueueOnConnect = true;
+            ConnectSocket();
+            SetQueueUI(true); // show "searching" UI immediately so button feels responsive
+            return;
+        }
 
+        _joinQueueOnConnect = false;
         IsInQueue = true;
         SetQueueUI(true);
 
@@ -117,6 +137,7 @@ public class MatchmakingManager : MonoBehaviour
 
     public void LeaveQueue()
     {
+        _joinQueueOnConnect = false;
         IsInQueue = false;
         SetQueueUI(false);
 
@@ -129,6 +150,15 @@ public class MatchmakingManager : MonoBehaviour
     // ── Invite Links ───────────────────────────────────────────────────────────
     public void CreateInviteLink()
     {
+        if (!IsConnected)
+        {
+            // BUG FIX: same pattern as JoinQueue — queue the action for after connect
+            _createInviteOnConnect = true;
+            ConnectSocket();
+            return;
+        }
+
+        _createInviteOnConnect = false;
         StartCoroutine(FetchInviteLink());
     }
 
@@ -148,46 +178,40 @@ public class MatchmakingManager : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError("[Matchmaking] Failed to create invite: " + req.error);
+            Debug.LogWarning("[Matchmaking] Failed to create invite: " + req.error);
             yield break;
         }
 
-        var resp = JsonUtility.FromJson<InviteResponse>(req.downloadHandler.text);
-        _currentInviteUrl = resp.inviteUrl;
+        var data = JsonUtility.FromJson<InviteResponse>(req.downloadHandler.text);
+        _currentInviteUrl = data.inviteUrl;
 
+        if (inviteLinkText) inviteLinkText.text = data.inviteUrl;
         if (invitePanel)    invitePanel.SetActive(true);
-        if (inviteLinkText) inviteLinkText.text = resp.inviteUrl;
 
+        // Host joins their own invite room to wait
 #if UNITY_WEBGL && !UNITY_EDITOR
-        SocketJoinInviteRoom(resp.code);
+        SocketJoinInviteRoom(data.code);
 #endif
-        Debug.Log("[Matchmaking] Invite created: " + resp.inviteUrl);
+
+        Debug.Log("[Matchmaking] Invite created: " + data.inviteUrl);
     }
 
-    public void CopyInviteLink()
+    private void CopyInviteLink()
     {
         if (string.IsNullOrEmpty(_currentInviteUrl)) return;
 
+        var txt   = copyInviteButton?.GetComponentInChildren<TMP_Text>();
+        var flash = txt?.text ?? "Copied!";
+
 #if UNITY_WEBGL && !UNITY_EDITOR
         CopyToClipboard(_currentInviteUrl);
+        if (txt != null)
+            StartCoroutine(FlashText(txt, "Copied!", flash, 2f));
 #else
         GUIUtility.systemCopyBuffer = _currentInviteUrl;
-        OnClipboardCopied("success");
+        if (txt != null)
+            StartCoroutine(FlashText(txt, "Copied!", flash, 2f));
 #endif
-    }
-
-    /// <summary>Called by ItchOAuth.jslib after clipboard copy attempt.</summary>
-    public void OnClipboardCopied(string result)
-    {
-        if (copyInviteButton)
-        {
-            var txt = copyInviteButton.GetComponentInChildren<TMP_Text>();
-            if (txt)
-            {
-                string flash = result == "success" ? "Copied!" : "Try again";
-                StartCoroutine(FlashText(txt, flash, "Copy Link", 2f));
-            }
-        }
     }
 
     // ── Check for Invite on Load ───────────────────────────────────────────────
@@ -219,6 +243,19 @@ public class MatchmakingManager : MonoBehaviour
         if (queueStatusText)
             queueStatusText.text = $"Joining {data.hostName}'s game...";
 
+        // Ensure connected before joining invite room
+        if (!IsConnected)
+        {
+            ConnectSocket();
+            // Wait for connection (up to 5 seconds)
+            float waited = 0f;
+            while (!IsConnected && waited < 5f)
+            {
+                waited += Time.deltaTime;
+                yield return null;
+            }
+        }
+
 #if UNITY_WEBGL && !UNITY_EDITOR
         SocketJoinInvite(code);
 #endif
@@ -231,6 +268,12 @@ public class MatchmakingManager : MonoBehaviour
     {
         IsConnected = true;
         Debug.Log("[Matchmaking] Socket connected");
+
+        // BUG FIX: execute any action that was deferred waiting for the socket
+        if (_joinQueueOnConnect)
+            JoinQueue();
+        else if (_createInviteOnConnect)
+            CreateInviteLink();
     }
 
     /// <summary>Called by jslib when online count updates.</summary>
@@ -278,11 +321,9 @@ public class MatchmakingManager : MonoBehaviour
             var data = JsonUtility.FromJson<CRSUpdateData>(json);
             Debug.Log($"[Matchmaking] CRS update — Wins: {data.wins}, Games: {data.gamesPlayed}, CRS: {data.crs}");
 
-            // Push the updated stats into ItchAuthManager so the lobby reflects them
             if (ItchAuthManager.Instance != null)
                 ItchAuthManager.Instance.UpdateStats(data.wins, data.gamesPlayed);
 
-            // Refresh the leaderboard display
             if (LeaderboardManager.Instance != null)
                 LeaderboardManager.Instance.RefreshLeaderboard();
         }
@@ -382,7 +423,7 @@ public class MatchData
 {
     public string roomId;
     public string opponentName;
-    public string role;     // "peeker" or "guesser"
+    public string role;
     public string message;
 }
 

@@ -33,18 +33,18 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject panelResult;
 
     [Header("Setup Phase")]
-    [SerializeField] private TMP_Text   roleText;           // "You are the PEEKER" / "GUESSER"
+    [SerializeField] private TMP_Text   roleText;
     [SerializeField] private TMP_Text   opponentNameText;
     [SerializeField] private TMP_Text   roleDescriptionText;
 
     [Header("Peek Phase")]
-    [SerializeField] private GameObject peekPanel;          // only visible to peeker
-    [SerializeField] private TMP_Text   peekRevealText;     // "🥕 CARROT!" or "📦 EMPTY"
-    [SerializeField] private Animator   boxOpenAnimator;    // plays box-open animation
+    [SerializeField] private GameObject peekPanel;
+    [SerializeField] private TMP_Text   peekRevealText;
+    [SerializeField] private Animator   boxOpenAnimator;
 
     [Header("Deliberation Phase")]
     [SerializeField] private TMP_Text   deliberateTimerText;
-    [SerializeField] private TMP_Text   deliberateHintText;  // tip for peeker/guesser
+    [SerializeField] private TMP_Text   deliberateHintText;
     [SerializeField] private Slider     timerSlider;
     [SerializeField] private float      deliberationSeconds = 30f;
 
@@ -53,7 +53,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private Button     btnSwap;
     [SerializeField] private Button     btnKeep;
     [SerializeField] private TMP_Text   decisionPromptText;
-    [SerializeField] private TMP_Text   guesserWaitingText; // shown to peeker while guesser decides
+    [SerializeField] private TMP_Text   guesserWaitingText;
 
     [Header("Reveal Phase")]
     [SerializeField] private GameObject myBoxReveal;
@@ -64,7 +64,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private Animator   opponentBoxAnimator;
 
     [Header("Result Phase")]
-    [SerializeField] private TMP_Text   resultHeadlineText; // "YOU WIN!" / "YOU LOSE"
+    [SerializeField] private TMP_Text   resultHeadlineText;
     [SerializeField] private TMP_Text   resultDetailText;
     [SerializeField] private Button     btnPlayAgain;
     [SerializeField] private Button     btnBackToLobby;
@@ -73,7 +73,7 @@ public class GameController : MonoBehaviour
     [Header("Shared HUD")]
     [SerializeField] private TMP_Text   myNameText;
     [SerializeField] private TMP_Text   oppNameText;
-    [SerializeField] private TMP_Text   phaseLabel;         // phase banner
+    [SerializeField] private TMP_Text   phaseLabel;
     [SerializeField] private GameObject myBoxSprite;
     [SerializeField] private GameObject opponentBoxSprite;
 
@@ -82,8 +82,8 @@ public class GameController : MonoBehaviour
     public GamePhase CurrentPhase { get; private set; } = GamePhase.None;
 
     private PlayerRole _myRole;
-    private bool       _hasCarrot;        // what's in MY box (only meaningful after peek for peeker)
-    private bool       _swapped;          // did the guesser swap?
+    private bool       _hasCarrot;
+    private bool       _swapped;
     private string     _opponentName;
     private string     _roomId;
     private Coroutine  _timerCoroutine;
@@ -99,14 +99,13 @@ public class GameController : MonoBehaviour
 
     void Start()
     {
-        if (btnSwap)      btnSwap.onClick.AddListener(() => OnGuesserDecision(true));
-        if (btnKeep)      btnKeep.onClick.AddListener(() => OnGuesserDecision(false));
-        if (btnPlayAgain) btnPlayAgain.onClick.AddListener(OnPlayAgain);
+        if (btnSwap)        btnSwap.onClick.AddListener(() => OnGuesserDecision(true));
+        if (btnKeep)        btnKeep.onClick.AddListener(() => OnGuesserDecision(false));
+        if (btnPlayAgain)   btnPlayAgain.onClick.AddListener(OnPlayAgain);
         if (btnBackToLobby) btnBackToLobby.onClick.AddListener(OnBackToLobby);
 
         ShowPhasePanel(null);
 
-        // Subscribe to matchmaking
         if (MatchmakingManager.Instance != null)
         {
             MatchmakingManager.Instance.OnMatchFound           += HandleMatchFound;
@@ -132,7 +131,6 @@ public class GameController : MonoBehaviour
 
         Debug.Log($"[Game] Match found! Role: {_myRole}, Opponent: {_opponentName}");
 
-        // Start VOIP — peeker is the WebRTC initiator
         if (VoipManager.Instance != null)
             VoipManager.Instance.StartVoip(match.roomId, _myRole == PlayerRole.Peeker);
 
@@ -146,9 +144,9 @@ public class GameController : MonoBehaviour
         ShowPhasePanel(panelSetup);
         SetPhaseLabel("GAME START");
 
-        if (myNameText)       myNameText.text    = ItchAuthManager.Instance?.DisplayName ?? "You";
-        if (oppNameText)      oppNameText.text    = _opponentName;
-        if (opponentNameText) opponentNameText.text = _opponentName;
+        if (myNameText)       myNameText.text       = ItchAuthManager.Instance?.DisplayName ?? "You";
+        if (oppNameText)      oppNameText.text       = _opponentName;
+        if (opponentNameText) opponentNameText.text  = _opponentName;
 
         if (_myRole == PlayerRole.Peeker)
         {
@@ -163,7 +161,6 @@ public class GameController : MonoBehaviour
                 "You cannot see your box.\nListen carefully — then decide whether to swap.";
         }
 
-        // Auto-advance to peek phase after a short countdown
         StartCoroutine(DelayThen(3f, EnterPeekPhase));
     }
 
@@ -201,12 +198,10 @@ public class GameController : MonoBehaviour
                 }
             }));
 
-            // Peeker sees contents for 3 seconds, then deliberation starts
             StartCoroutine(DelayThen(4f, EnterDeliberationPhase));
         }
         else
         {
-            // Guesser waits — server will fire the transition
             if (peekPanel) peekPanel.SetActive(false);
             SetPhaseLabel("OPPONENT IS PEEKING...");
         }
@@ -222,6 +217,12 @@ public class GameController : MonoBehaviour
 
     private void EnterDeliberationPhase()
     {
+        // Guard: don't re-enter if already in or past this phase
+        if (CurrentPhase == GamePhase.Deliberate ||
+            CurrentPhase == GamePhase.Decision   ||
+            CurrentPhase == GamePhase.Reveal     ||
+            CurrentPhase == GamePhase.Result) return;
+
         CurrentPhase = GamePhase.Deliberate;
         ShowPhasePanel(panelDeliberate);
         SetPhaseLabel("DELIBERATION");
@@ -252,12 +253,31 @@ public class GameController : MonoBehaviour
             yield return null;
         }
 
-        EnterDecisionPhase();
+        // Only the guesser's client needs to act; server drives authoritative decision phase
+        // The server will fire game_decision_start for both clients anyway
     }
 
     // ── PHASE: DECISION ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by server socket event "game_decision_start".
+    /// BUG FIX: this event was received but never handled — the switch statement
+    /// in OnGameEvent was missing this case entirely, so the decision phase
+    /// would never appear on either client.
+    /// </summary>
+    public void OnServerDecisionStart(string json)
+    {
+        EnterDecisionPhase();
+    }
+
     private void EnterDecisionPhase()
     {
+        if (_timerCoroutine != null)
+        {
+            StopCoroutine(_timerCoroutine);
+            _timerCoroutine = null;
+        }
+
         CurrentPhase = GamePhase.Decision;
         ShowPhasePanel(panelDecision);
         SetPhaseLabel("MAKE YOUR CHOICE");
@@ -271,7 +291,6 @@ public class GameController : MonoBehaviour
         }
         else
         {
-            // Peeker waits
             if (decisionPanel) decisionPanel.SetActive(false);
             if (guesserWaitingText)
             {
@@ -286,12 +305,13 @@ public class GameController : MonoBehaviour
         _swapped = swap;
         if (decisionPanel) decisionPanel.SetActive(false);
 
-        // Recalculate: if swapped, my contents flip
-        if (swap) _hasCarrot = !_hasCarrot;
+        // BUG FIX: do NOT flip _hasCarrot locally here. The server sends the
+        // authoritative final state in the game_reveal event. Flipping locally
+        // before that arrives can cause the reveal to show wrong contents if
+        // the server's timeout fires a different result than the client assumed.
 
         Debug.Log($"[Game] Guesser decision: {(swap ? "SWAP" : "KEEP")}");
 
-        // Notify server
         SendGameEvent("game_decision", $"{{\"swap\":{(swap ? "true" : "false")}}}");
 
         SetPhaseLabel("WAITING FOR REVEAL...");
@@ -306,7 +326,9 @@ public class GameController : MonoBehaviour
     public void OnServerReveal(string json)
     {
         var data = JsonUtility.FromJson<RevealData>(json);
+        // Use server-authoritative values, not locally computed ones
         _hasCarrot = data.myCarrot;
+        _swapped   = data.swapped;
         EnterRevealPhase(data.myCarrot, data.opponentCarrot, data.swapped);
     }
 
@@ -316,57 +338,32 @@ public class GameController : MonoBehaviour
         ShowPhasePanel(panelReveal);
         SetPhaseLabel("REVEAL!");
 
-        StartCoroutine(DoRevealSequence(myCarrot, opponentCarrot, swapped));
-    }
-
-    private IEnumerator DoRevealSequence(bool myCarrot, bool opponentCarrot, bool swapped)
-    {
-        // Dramatic pause
-        yield return new WaitForSeconds(0.8f);
-
-        // Open my box
-        if (myBoxAnimator) myBoxAnimator.SetTrigger("Open");
-        yield return new WaitForSeconds(0.5f);
         if (myBoxContentsText)
-            myBoxContentsText.text = myCarrot ? "🥕" : "📦";
+            myBoxContentsText.text = myCarrot
+                ? "<color=#e85d20>🥕 CARROT!</color>"
+                : "<color=#aaaaaa>📦 EMPTY</color>";
 
-        yield return new WaitForSeconds(0.8f);
-
-        // Open opponent's box
-        if (opponentBoxAnimator) opponentBoxAnimator.SetTrigger("Open");
-        yield return new WaitForSeconds(0.5f);
         if (opponentBoxContentsText)
-            opponentBoxContentsText.text = opponentCarrot ? "🥕" : "📦";
+            opponentBoxContentsText.text = opponentCarrot
+                ? "<color=#e85d20>🥕 CARROT!</color>"
+                : "<color=#aaaaaa>📦 EMPTY</color>";
 
-        yield return new WaitForSeconds(1.2f);
-
-        // Determine winner: the player with the carrot wins
-        bool iWin = myCarrot;
-        EnterResultPhase(iWin, myCarrot, opponentCarrot, swapped);
+        if (myBoxAnimator)       myBoxAnimator.SetTrigger("Open");
+        if (opponentBoxAnimator) opponentBoxAnimator.SetTrigger("Open");
     }
 
     // ── PHASE: RESULT ─────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Called by server socket event "game_result".
-    /// Server sends: { winner: "peeker"|"guesser", myCarrot: bool, opponentCarrot: bool, newCRS: int }
-    /// </summary>
+    /// <summary>Called by server socket event "game_result".</summary>
     public void OnServerResult(string json)
     {
-        var data   = JsonUtility.FromJson<ResultData>(json);
-        bool iWin  = data.winner == (_myRole == PlayerRole.Peeker ? "peeker" : "guesser");
-        EnterResultPhase(iWin, data.myCarrot, data.opponentCarrot, _swapped);
+        var data = JsonUtility.FromJson<ResultData>(json);
+
+        bool iWin     = data.myCarrot;
+        string swapNote = _swapped ? "The boxes were swapped." : "The boxes were not swapped.";
 
         if (newCRSText)
-            newCRSText.text = $"Your new CRS: {data.newCRS}";
-    }
-
-    private void EnterResultPhase(bool iWin, bool myCarrot, bool opponentCarrot, bool swapped)
-    {
-        CurrentPhase = GamePhase.Result;
-        ShowPhasePanel(panelResult);
-
-        string swapNote = swapped ? "(boxes were swapped)" : "(boxes were kept)";
+            newCRSText.text = $"New CRS: {data.newCRS}";
 
         if (resultHeadlineText)
         {
@@ -388,12 +385,13 @@ public class GameController : MonoBehaviour
             resultDetailText.text = detail;
         }
 
-        // Stop VOIP
         if (VoipManager.Instance != null)
             VoipManager.Instance.StopVoip();
 
-        // Report result to server for CRS update
         SendGameEvent("game_result_ack", $"{{\"won\":{(iWin ? "true" : "false")}}}");
+
+        ShowPhasePanel(panelResult);
+        CurrentPhase = GamePhase.Result;
     }
 
     // ── Button Handlers ───────────────────────────────────────────────────────
@@ -437,13 +435,18 @@ public class GameController : MonoBehaviour
 
         switch (env.eventType)
         {
-            case "game_peek_ready":      OnServerPeekReady(env.payload);      break;
-            case "game_deliberate_start":OnServerDeliberateStart(env.payload); break;
-            case "game_reveal":          OnServerReveal(env.payload);          break;
-            case "game_result":          OnServerResult(env.payload);          break;
+            case "game_peek_ready":       OnServerPeekReady(env.payload);      break;
+            case "game_deliberate_start": OnServerDeliberateStart(env.payload); break;
+            // BUG FIX: this case was completely missing — decision phase never triggered
+            case "game_decision_start":   OnServerDecisionStart(env.payload);   break;
+            case "game_reveal":           OnServerReveal(env.payload);          break;
+            case "game_result":           OnServerResult(env.payload);          break;
             case "voip_signal":
                 if (VoipManager.Instance != null)
                     VoipManager.Instance.HandleVoipSignal(env.payload);
+                break;
+            default:
+                Debug.LogWarning($"[Game] Unhandled event type: {env.eventType}");
                 break;
         }
     }
@@ -489,4 +492,4 @@ public class GameController : MonoBehaviour
 [Serializable] public class GameEventEnvelope { public string eventType; public string payload; }
 [Serializable] public class PeekReadyData     { public bool hasCarrot; }
 [Serializable] public class RevealData        { public bool myCarrot; public bool opponentCarrot; public bool swapped; }
-[Serializable] public class ResultData        { public string winner; public bool myCarrot; public bool opponentCarrot; public int newCRS; }
+[Serializable] public class ResultData        { public string winner; public bool myCarrot; public bool opponentCarrot; public bool swapped; public int newCRS; }

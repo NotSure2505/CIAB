@@ -25,12 +25,14 @@ public class LeaderboardManager : MonoBehaviour
     [SerializeField] private string serverBaseUrl = "https://sea-turtle-app-k7m7l.ondigitalocean.app";
 
     [Header("UI References")]
-    [SerializeField] private Transform     leaderboardContent;   // ScrollRect → Viewport → Content
-    [SerializeField] private GameObject    rowPrefab;            // LeaderboardRow prefab
-    [SerializeField] private TMP_Text      playerCRSText;        // Shows "You: 🐇 Digger · CRS 312"
-    [SerializeField] private TMP_Text      statusText;           // "Loading..." / "Updated just now"
+    [SerializeField] private Transform     leaderboardContent;
+    [SerializeField] private GameObject    rowPrefab;
+    [SerializeField] private TMP_Text      playerCRSText;
+    [SerializeField] private TMP_Text      statusText;
     [SerializeField] private float         autoRefreshSeconds = 30f;
 
+    // BUG FIX: initialise to the full interval so the first Update tick doesn't
+    // immediately trigger a second fetch on top of the one already started in Start().
     private float _refreshTimer;
     private bool  _isFetching;
 
@@ -63,6 +65,10 @@ public class LeaderboardManager : MonoBehaviour
 
     void Start()
     {
+        // BUG FIX: set timer to full interval up front so Update doesn't fire
+        // an immediate duplicate fetch alongside the ones we're about to start.
+        _refreshTimer = autoRefreshSeconds;
+
         RefreshPlayerCRS();
         RefreshLeaderboard();
     }
@@ -118,21 +124,25 @@ public class LeaderboardManager : MonoBehaviour
     // ── Fetch Single Player CRS ────────────────────────────────────────────────
     private IEnumerator FetchPlayerCRS(string token)
     {
-        using var req = new UnityWebRequest($"{serverBaseUrl}/player/crs", "GET");
-        req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Authorization", $"Bearer {token}");
-        yield return req.SendWebRequest();
+        // BUG FIX: the server has no /player/crs endpoint. The validate endpoint
+        // returns wins/gamesPlayed which is all we need to compute CRS locally,
+        // and the crs_update socket event keeps it current during a session.
+        // Fall back to computing CRS from cached ItchAuthManager stats.
+        if (ItchAuthManager.Instance == null || !ItchAuthManager.Instance.IsLoggedIn)
+            yield break;
 
-        if (req.result != UnityWebRequest.Result.Success) yield break;
-
-        var data     = JsonUtility.FromJson<LeaderboardEntry>(req.downloadHandler.text);
-        var rankInfo = GetRank(data.crs);
+        int wins        = ItchAuthManager.Instance.Wins;
+        int gamesPlayed = ItchAuthManager.Instance.GamesPlayed;
+        int crs         = CalcCRS(wins, gamesPlayed);
+        var rankInfo    = GetRank(crs);
 
         if (playerCRSText)
         {
-            playerCRSText.text = $"You · {rankInfo.emoji} <b>{rankInfo.name}</b> · CRS {data.crs}";
+            playerCRSText.text  = $"You · {rankInfo.emoji} <b>{rankInfo.name}</b> · CRS {crs}";
             playerCRSText.color = rankInfo.color;
         }
+
+        yield break;
     }
 
     // ── Populate Rows ──────────────────────────────────────────────────────────
@@ -144,7 +154,6 @@ public class LeaderboardManager : MonoBehaviour
             return;
         }
 
-        // Clear existing rows
         foreach (Transform child in leaderboardContent)
             Destroy(child.gameObject);
 
@@ -156,7 +165,8 @@ public class LeaderboardManager : MonoBehaviour
             return;
         }
 
-        string localName = PlayerPrefs.GetString("ciab_displayName", "");
+        string localName = ItchAuthManager.Instance?.DisplayName
+                           ?? PlayerPrefs.GetString("ciab_displayName", "");
 
         for (int i = 0; i < entries.Length; i++)
         {
@@ -165,23 +175,25 @@ public class LeaderboardManager : MonoBehaviour
             var rankInfo = GetRank(entry.crs);
             bool isYou   = entry.displayName == localName;
 
-            // The prefab should have child TMP objects with these names:
-            SetText(row, "RankNumber",  $"#{i + 1}");
-            SetText(row, "RankEmoji",   rankInfo.emoji);
-            SetText(row, "PlayerName",  isYou ? $"{entry.displayName} (You)" : entry.displayName);
-            SetText(row, "RankName",    rankInfo.name);
-            SetText(row, "CRSScore",    $"{entry.crs}");
-            SetText(row, "WinLoss",     $"{entry.wins}W / {entry.losses}L");
-            SetText(row, "WinRate",     $"{Mathf.RoundToInt(entry.winRate * 100)}%");
+            // BUG FIX: server leaderboard response does not include losses or winRate
+            // fields — compute them locally from wins and gamesPlayed.
+            int   losses  = entry.gamesPlayed - entry.wins;
+            float winRate = entry.gamesPlayed > 0 ? (float)entry.wins / entry.gamesPlayed : 0f;
 
-            // Highlight your own row
+            SetText(row, "RankNumber", $"#{i + 1}");
+            SetText(row, "RankEmoji",  rankInfo.emoji);
+            SetText(row, "PlayerName", isYou ? $"{entry.displayName} (You)" : entry.displayName);
+            SetText(row, "RankName",   rankInfo.name);
+            SetText(row, "CRSScore",   $"{entry.crs}");
+            SetText(row, "WinLoss",    $"{entry.wins}W / {losses}L");
+            SetText(row, "WinRate",    $"{Mathf.RoundToInt(winRate * 100)}%");
+
             if (isYou)
             {
                 var bg = row.GetComponent<Image>();
                 if (bg) bg.color = new Color(0.91f, 0.36f, 0.13f, 0.15f);
             }
 
-            // Color rank name by tier
             var rankNameText = row.transform.Find("RankName")?.GetComponent<TMP_Text>();
             if (rankNameText) rankNameText.color = rankInfo.color;
         }
@@ -221,12 +233,9 @@ public class LeaderboardEntry
     public string displayName;
     public int    wins;
     public int    gamesPlayed;
-    public int    losses;
-    public float  winRate;
+    // BUG FIX: removed losses/winRate/rank/rankEmoji/tier — server doesn't send these.
+    // They are now computed locally in PopulateRows.
     public int    crs;
-    public string rank;
-    public string rankEmoji;
-    public int    tier;
 }
 
 [Serializable]
