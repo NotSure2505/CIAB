@@ -4,35 +4,41 @@ using TMPro;
 
 /// <summary>
 /// Carrot in a Box — Lobby Manager
-/// The HTML title screen handles login. By the time Unity loads,
-/// the player is already authenticated. This script populates the
-/// lobby UI and connects matchmaking.
+///
+/// Populates the lobby UI after login and hides/shows LobbyPanel
+/// when a game starts or ends. MatchmakingPanel is a child of
+/// LobbyPanel so it hides/shows automatically with it.
+///
+/// Inspector setup:
+///   - playerNameText → LobbyPanel → PlayerNameText
+///   - playerRankText → LobbyPanel → PlayerCRSText
+///   - lobbyPanel        → LobbyPanel
 /// </summary>
 public class LobbyManager : MonoBehaviour
 {
     [Header("Player Info")]
-    [SerializeField] private TextMeshProUGUI playerNameText;  // "Welcome, NotSure2505!"
-    [SerializeField] private TextMeshProUGUI playerRankText;  // "Seedling · CRS 42"
+    [SerializeField] private TextMeshProUGUI playerNameText;   // LobbyPanel → PlayerNameText
+    [SerializeField] private TextMeshProUGUI playerRankText;   // LobbyPanel → PlayerCRSText
+
+    [Header("Panels")]
+    [SerializeField] private GameObject lobbyPanel;               // LobbyPanel — hidden on match found
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
     void Start()
     {
-        // Listen for match events
         if (MatchmakingManager.Instance != null)
         {
             MatchmakingManager.Instance.OnMatchFound           += HandleMatchFound;
             MatchmakingManager.Instance.OnOpponentDisconnected += HandleOpponentDisconnected;
         }
 
-        // If already logged in (token restored from PlayerPrefs), populate now.
-        // Otherwise wait for OnLoginSuccess fired by ItchAuthManager.
         if (ItchAuthManager.Instance != null)
         {
             ItchAuthManager.Instance.OnLoginSuccess += HandleLoginSuccess;
 
             if (ItchAuthManager.Instance.IsLoggedIn)
             {
-                PopulateLobbyUI(
+                PopulateLobbyPanel(
                     ItchAuthManager.Instance.DisplayName,
                     ItchAuthManager.Instance.Wins,
                     ItchAuthManager.Instance.GamesPlayed
@@ -43,6 +49,8 @@ public class LobbyManager : MonoBehaviour
         {
             Debug.LogWarning("[Lobby] ItchAuthManager not found on GameManager.");
         }
+
+        if (lobbyPanel) lobbyPanel.SetActive(true);
     }
 
     void OnDestroy()
@@ -57,14 +65,21 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-    // ── Login Success ──────────────────────────────────────────────────────────
-
-    private void HandleLoginSuccess(PlayerData data)
+    // ── Public: called by GameController when returning to lobby ──────────────
+    public void ShowLobby()
     {
-        PopulateLobbyUI(data.displayName, data.wins, data.gamesPlayed);
+        if (lobbyPanel) lobbyPanel.SetActive(true);
+        if (MatchmakingManager.Instance != null)
+            MatchmakingManager.Instance.ShowLobby();
     }
 
-    private void PopulateLobbyUI(string displayName, int wins, int gamesPlayed)
+    // ── Login Success ──────────────────────────────────────────────────────────
+    private void HandleLoginSuccess(PlayerData data)
+    {
+        PopulateLobbyPanel(data.displayName, data.wins, data.gamesPlayed);
+    }
+
+    private void PopulateLobbyPanel(string displayName, int wins, int gamesPlayed)
     {
         if (playerNameText)
             playerNameText.text = $"Welcome, {displayName}!";
@@ -88,17 +103,17 @@ public class LobbyManager : MonoBehaviour
     }
 
     // ── Match Events ───────────────────────────────────────────────────────────
-
     private void HandleMatchFound(MatchData match)
     {
         Debug.Log($"[Lobby] Match found! Opponent: {match.opponentName}, Role: {match.role}");
-        // TODO: Load game scene when ready
-        // SceneManager.LoadScene("GameScene");
+        if (lobbyPanel) lobbyPanel.SetActive(false);
+        // GameController.HandleMatchFound() fires automatically from the same event.
     }
 
     private void HandleOpponentDisconnected(string reason)
     {
         Debug.Log("[Lobby] Opponent disconnected — back to lobby");
+        if (lobbyPanel) lobbyPanel.SetActive(true);
         if (MatchmakingManager.Instance != null)
             MatchmakingManager.Instance.ShowLobby();
     }

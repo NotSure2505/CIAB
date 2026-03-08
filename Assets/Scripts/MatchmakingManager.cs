@@ -24,13 +24,13 @@ public class MatchmakingManager : MonoBehaviour
     [SerializeField] private string itchGameUrl   = "https://notsure2505.itch.io/carrot-in-a-box";
 
     [Header("UI References")]
-    [SerializeField] private TMP_Text  onlineCountText;     // "12 players online"
-    [SerializeField] private Button    findMatchButton;     // "Find Match"
-    [SerializeField] private Button    cancelQueueButton;   // "Cancel"
-    [SerializeField] private Button    createInviteButton;  // "Invite a Friend"
-    [SerializeField] private TMP_Text  queueStatusText;     // "Searching for opponent..."
-    [SerializeField] private TMP_Text  inviteLinkText;      // shows the invite URL
-    [SerializeField] private Button    copyInviteButton;    // "Copy Link"
+    [SerializeField] private TMP_Text   onlineCountText;    // "12 players online"
+    [SerializeField] private Button     findMatchButton;    // "Find Match"
+    [SerializeField] private Button     cancelQueueButton;  // "Cancel"
+    [SerializeField] private Button     createInviteButton; // "Invite a Friend"
+    [SerializeField] private TMP_Text   queueStatusText;    // "Searching for opponent..."
+    [SerializeField] private TMP_Text   inviteLinkText;     // shows the invite URL
+    [SerializeField] private Button     copyInviteButton;   // "Copy Link"
     [SerializeField] private GameObject matchmakingPanel;   // the whole panel
     [SerializeField] private GameObject invitePanel;        // invite link panel
 
@@ -40,13 +40,13 @@ public class MatchmakingManager : MonoBehaviour
     public event Action<int>       OnOnlineCountUpdated;
 
     // ── State ──────────────────────────────────────────────────────────────────
-    public bool     IsConnected  { get; private set; }
-    public bool     IsInQueue    { get; private set; }
-    public MatchData CurrentMatch { get; private set; }
+    public bool      IsConnected   { get; private set; }
+    public bool      IsInQueue     { get; private set; }
+    public MatchData CurrentMatch  { get; private set; }
 
     private string _currentInviteUrl;
-    private Coroutine _onlineCountCoroutine;
 
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
     void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
@@ -55,51 +55,25 @@ public class MatchmakingManager : MonoBehaviour
 
     void Start()
     {
-        // Wire buttons
         if (findMatchButton)    findMatchButton.onClick.AddListener(JoinQueue);
         if (cancelQueueButton)  cancelQueueButton.onClick.AddListener(LeaveQueue);
         if (createInviteButton) createInviteButton.onClick.AddListener(CreateInviteLink);
         if (copyInviteButton)   copyInviteButton.onClick.AddListener(CopyInviteLink);
 
-        // Initial UI state — panel starts hidden, shown after login via ShowLobby()
         SetQueueUI(false);
-
-        // Start background online count polling (REST fallback)
-        _onlineCountCoroutine = StartCoroutine(PollOnlineCount());
-
-        // Check if launched via invite link
         CheckForInviteCode();
     }
 
-    void OnDestroy()
-    {
-        if (_onlineCountCoroutine != null) StopCoroutine(_onlineCountCoroutine);
-        DisconnectSocket();
-    }
-
-    // ── Public API ─────────────────────────────────────────────────────────────
-
-    /// <summary>Called by ItchAuthManager after login succeeds.</summary>
+    // ── Show Lobby ─────────────────────────────────────────────────────────────
     public void ShowLobby()
     {
         if (matchmakingPanel) matchmakingPanel.SetActive(true);
-        ConnectSocket();
-        StartCoroutine(RefreshOnlineCount());
-    }
-
-    private IEnumerator RefreshOnlineCount()
-    {
-        using var req = UnityWebRequest.Get($"{serverBaseUrl}/lobby/online");
-        yield return req.SendWebRequest();
-        if (req.result == UnityWebRequest.Result.Success)
-        {
-            var data = JsonUtility.FromJson<OnlineCountResponse>(req.downloadHandler.text);
-            UpdateOnlineCountUI(data.onlineCount);
-        }
+        if (invitePanel)      invitePanel.SetActive(false);
+        SetQueueUI(false);
+        StartCoroutine(PollOnlineCount());
     }
 
     // ── Socket Connection ──────────────────────────────────────────────────────
-
     public void ConnectSocket()
     {
         string token = PlayerPrefs.GetString("ciab_token", "");
@@ -126,7 +100,6 @@ public class MatchmakingManager : MonoBehaviour
     }
 
     // ── Matchmaking Queue ──────────────────────────────────────────────────────
-
     public void JoinQueue()
     {
         if (!IsConnected) { ConnectSocket(); return; }
@@ -137,7 +110,6 @@ public class MatchmakingManager : MonoBehaviour
 #if UNITY_WEBGL && !UNITY_EDITOR
         SocketJoinQueue();
 #else
-        // Editor fallback — simulate via REST
         StartCoroutine(SimulateQueueEditor());
 #endif
         Debug.Log("[Matchmaking] Joined queue");
@@ -155,7 +127,6 @@ public class MatchmakingManager : MonoBehaviour
     }
 
     // ── Invite Links ───────────────────────────────────────────────────────────
-
     public void CreateInviteLink()
     {
         StartCoroutine(FetchInviteLink());
@@ -184,11 +155,9 @@ public class MatchmakingManager : MonoBehaviour
         var resp = JsonUtility.FromJson<InviteResponse>(req.downloadHandler.text);
         _currentInviteUrl = resp.inviteUrl;
 
-        // Show invite panel
-        if (invitePanel)   invitePanel.SetActive(true);
+        if (invitePanel)    invitePanel.SetActive(true);
         if (inviteLinkText) inviteLinkText.text = resp.inviteUrl;
 
-        // Also join the invite room via socket so we're waiting
 #if UNITY_WEBGL && !UNITY_EDITOR
         SocketJoinInviteRoom(resp.code);
 #endif
@@ -222,11 +191,8 @@ public class MatchmakingManager : MonoBehaviour
     }
 
     // ── Check for Invite on Load ───────────────────────────────────────────────
-
     private void CheckForInviteCode()
     {
-        // Read invite code from URL hash (set by itch.io invite link)
-        // The jslib reads window.location.hash and passes it here
 #if UNITY_WEBGL && !UNITY_EDITOR
         GetInviteCodeFromURL();
 #endif
@@ -300,8 +266,33 @@ public class MatchmakingManager : MonoBehaviour
         OnOpponentDisconnected?.Invoke(msg);
     }
 
-    // ── Online Count Polling (REST fallback) ───────────────────────────────────
+    /// <summary>
+    /// Called by MatchmakingSocket.jslib via SendMessage('GameManager', 'OnCRSUpdate', json).
+    /// Received after game_result_ack — server confirms updated win/loss and CRS.
+    /// Updates cached player stats so the lobby shows the correct rank on return.
+    /// </summary>
+    public void OnCRSUpdate(string json)
+    {
+        try
+        {
+            var data = JsonUtility.FromJson<CRSUpdateData>(json);
+            Debug.Log($"[Matchmaking] CRS update — Wins: {data.wins}, Games: {data.gamesPlayed}, CRS: {data.crs}");
 
+            // Push the updated stats into ItchAuthManager so the lobby reflects them
+            if (ItchAuthManager.Instance != null)
+                ItchAuthManager.Instance.UpdateStats(data.wins, data.gamesPlayed);
+
+            // Refresh the leaderboard display
+            if (LeaderboardManager.Instance != null)
+                LeaderboardManager.Instance.RefreshLeaderboard();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[Matchmaking] Failed to parse CRS update: " + e.Message);
+        }
+    }
+
+    // ── Online Count Polling (REST fallback) ───────────────────────────────────
     private IEnumerator PollOnlineCount()
     {
         while (true)
@@ -326,12 +317,10 @@ public class MatchmakingManager : MonoBehaviour
     }
 
     // ── Editor Simulation ─────────────────────────────────────────────────────
-
     private IEnumerator SimulateQueueEditor()
     {
         if (queueStatusText) queueStatusText.text = "Searching... (Editor mode)";
         yield return new WaitForSeconds(3f);
-        // Simulate a match found
         var fakeMatch = new MatchData
         {
             roomId       = "editor_test_room",
@@ -343,7 +332,6 @@ public class MatchmakingManager : MonoBehaviour
     }
 
     // ── UI Helpers ─────────────────────────────────────────────────────────────
-
     private void SetQueueUI(bool searching)
     {
         if (findMatchButton)   findMatchButton.gameObject.SetActive(!searching);
@@ -394,10 +382,11 @@ public class MatchData
 {
     public string roomId;
     public string opponentName;
-    public string role;    // "peeker" or "guesser"
+    public string role;     // "peeker" or "guesser"
     public string message;
 }
 
-[Serializable] public class OnlineCountResponse   { public int    onlineCount; }
-[Serializable] public class InviteResponse        { public string code; public string roomId; public string inviteUrl; }
-[Serializable] public class InviteValidateResponse { public bool valid; public string roomId; public string hostName; }
+[Serializable] public class OnlineCountResponse    { public int    onlineCount; }
+[Serializable] public class InviteResponse         { public string code; public string roomId; public string inviteUrl; }
+[Serializable] public class InviteValidateResponse { public bool   valid; public string roomId; public string hostName; }
+[Serializable] public class CRSUpdateData          { public int    wins; public int gamesPlayed; public int crs; }

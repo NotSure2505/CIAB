@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// <summary>
 /// Carrot in a Box — itch.io Auth Manager
 /// Works with your DigitalOcean OAuth server (PKCE flow).
-/// 
+///
 /// Setup:
 ///   1. Attach to your GameManager GameObject
 ///   2. Set Server Base URL in Inspector
@@ -27,12 +27,12 @@ public class ItchAuthManager : MonoBehaviour
     [SerializeField] private Button loginButton;
 
     // ── Public Player Data ─────────────────────────────────────────────────────
-    public bool   IsLoggedIn     { get; private set; }
-    public string DisplayName    { get; private set; }
-    public string ItchUsername   { get; private set; }
-    public int    ItchId         { get; private set; }
-    public int    Wins           { get; private set; }
-    public int    GamesPlayed    { get; private set; }
+    public bool   IsLoggedIn    { get; private set; }
+    public string DisplayName   { get; private set; }
+    public string ItchUsername  { get; private set; }
+    public int    ItchId        { get; private set; }
+    public int    Wins          { get; private set; }
+    public int    GamesPlayed   { get; private set; }
 
     // ── Events ─────────────────────────────────────────────────────────────────
     public event Action<PlayerData> OnLoginSuccess;
@@ -40,7 +40,7 @@ public class ItchAuthManager : MonoBehaviour
     public event Action             OnLogout;
 
     // ── Private ────────────────────────────────────────────────────────────────
-    private string   _sessionToken;
+    private string    _sessionToken;
     private Coroutine _pollCoroutine;
 
     // ── WebGL JS Bridge ────────────────────────────────────────────────────────
@@ -119,6 +119,17 @@ public class ItchAuthManager : MonoBehaviour
         StartCoroutine(DoLogout());
     }
 
+    /// <summary>
+    /// Called by MatchmakingManager.OnCRSUpdate to keep cached stats in sync
+    /// so the lobby rank text is correct when the player returns from a game.
+    /// </summary>
+    public void UpdateStats(int wins, int gamesPlayed)
+    {
+        Wins        = wins;
+        GamesPlayed = gamesPlayed;
+        Debug.Log($"[Auth] Stats updated — {wins}W / {gamesPlayed}G");
+    }
+
     // ── OAuth Flow ─────────────────────────────────────────────────────────────
 
     private IEnumerator BeginOAuthFlow()
@@ -144,12 +155,9 @@ public class ItchAuthManager : MonoBehaviour
         Debug.Log("[Auth] Opening auth URL: " + resp.authUrl);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-        // Open popup via jslib
         OpenAuthWindow(resp.authUrl);
 #else
-        // Desktop: open system browser
         Application.OpenURL(resp.authUrl);
-        // Start polling for completion
         if (_pollCoroutine != null) StopCoroutine(_pollCoroutine);
         _pollCoroutine = StartCoroutine(PollForToken());
 #endif
@@ -229,11 +237,8 @@ public class ItchAuthManager : MonoBehaviour
 
         if (loginButton != null) loginButton.gameObject.SetActive(false);
 
-        // Show lobby UI after login
         if (MatchmakingManager.Instance != null)
-        {
             MatchmakingManager.Instance.ShowLobby();
-        }
 
         OnLoginSuccess?.Invoke(data);
     }
